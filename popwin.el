@@ -23,12 +23,12 @@
 
 ;; Popwin makes you free from the hell of annoying buffers such like
 ;; *Help*, *Completions*, *compilation*, and etc.
-;; 
+;;
 ;; To use popwin, just add the following code into your .emacs:
-;; 
+;;
 ;;     (require 'popwin)
 ;;     (popwin-mode 1)
-;; 
+;;
 ;; Then try to show some buffer, for example *Help* or
 ;; *Completeions*. Unlike standard behavior, their buffers may be
 ;; shown in a popup window at the bottom of the frame. And you can
@@ -95,7 +95,7 @@ is :error."
 (defun popwin:switch-to-buffer (buffer-or-name &optional norecord)
   "Call `switch-to-buffer' forcing BUFFER-OF-NAME be displayed in
 the selected window."
-  (with-no-warnings 
+  (with-no-warnings
     (if (>= emacs-major-version 24)
         (switch-to-buffer buffer-or-name norecord t)
       (switch-to-buffer buffer-or-name norecord))))
@@ -432,7 +432,7 @@ popup buffer.")
     (loop for var in context-vars
           collect var
           collect (symbol-value var)))
-  
+
   (defun popwin:use-context (context)
     (loop for var = (pop context)
           for val = (pop context)
@@ -617,13 +617,14 @@ the popup window will be closed are followings:
                              noselect
                              dedicated
                              stick
-                             tail)
-  "Show BUFFER in a popup window and return the popup window. If
-NOSELECT is non-nil, the popup window will not be selected. If
-STICK is non-nil, the popup window will be stuck. If TAIL is
-non-nil, the popup window will show the last contents. Calling
-`popwin:popup-buffer' during `popwin:popup-buffer' is allowed. In
-that case, the buffer of the popup window will be replaced with
+                             tail
+                             inside)
+  "Show BUFFER in a popup window and return the popup window. If NOSELECT is
+non-nil, the popup window will not be selected. If STICK is non-nil, the popup
+window will be stuck. If TAIL is non-nil, the popup window will show the last
+contents. If INSIDE is non-nil, the popup window will show by spliting inside
+the current window. Calling `popwin:popup-buffer' during `popwin:popup-buffer'
+is allowed. In that case, the buffer of the popup window will be replaced with
 BUFFER."
   (interactive "BPopup buffer:\n")
   (setq buffer (get-buffer buffer))
@@ -638,8 +639,14 @@ BUFFER."
       (let ((win-outline (car (popwin:window-config-tree))))
         (destructuring-bind (master-win popup-win win-map)
             (let ((size (if (popwin:position-horizontal-p position) width height))
-                  (adjust popwin:adjust-other-windows))
-              (popwin:create-popup-window size position adjust))
+                   (adjust popwin:adjust-other-windows))
+              (if inside
+                ;; hack from https://emacs.stackexchange.com/questions/27711/how-to-make-pop-up-window-appear-in-the-divided-portion-of-the-frame
+                (let* ((orig-window (selected-window))
+                        (new-window (split-window orig-window nil 'below)))
+                  (set-window-buffer new-window buffer)
+                  (list orig-window new-window nil))
+                (popwin:create-popup-window size position adjust)))
           (setq popwin:popup-window popup-win
                 popwin:master-window master-win
                 popwin:window-outline win-outline
@@ -657,7 +664,7 @@ BUFFER."
             popwin:popup-last-config (list buffer
                                            :width width :height height :position position
                                            :noselect noselect :dedicated dedicated
-                                           :stick stick :tail tail)
+                                           :stick stick :tail tail :inside inside)
             popwin:popup-window-dedicated-p dedicated
             popwin:popup-window-stuck-p stick)))
   (if noselect
@@ -777,6 +784,9 @@ empty. Available keywords are following:
   tail: If the value is non-nil, the popup window will show the
     last contents.
 
+  inside: If the value is non-nil, the popup window will show by
+    spliting inside the current window.
+
 Examples: With '(\"*scratch*\" :height 30 :position top),
 *scratch* buffer will be shown at the top of the frame with
 height 30. With '(dired-mode :width 80 :position left), dired
@@ -804,7 +814,8 @@ buffers will be shown at the left of the frame with width 80."
                         (:noselect (boolean :tag "On/Off"))
                         (:dedicated (boolean :tag "On/Off"))
                         (:stick (boolean :tag "On/Off"))
-                        (:tail (boolean :tag "On/Off"))))))
+                        (:tail (boolean :tag "On/Off"))
+                        (:inside (boolean :tag "On/Off"))))))
   :get (lambda (symbol)
          (mapcar (lambda (element)
                    (if (consp element)
@@ -832,7 +843,7 @@ buffers will be shown at the left of the frame with width 80."
             (boundp 'frame))
        ;; Use variables ACTION and FRAME which are formal parameters
        ;; of DISPLAY-BUFFER.
-       ;; 
+       ;;
        ;; TODO use display-buffer-alist instead of
        ;; display-buffer-function.
        (funcall function buffer action frame)
@@ -921,7 +932,7 @@ specifies default values of the config."
           (return-from popwin:display-buffer-1
             (funcall if-config-not-found buffer))
         (setq pattern-and-keywords '(t))))
-    (destructuring-bind (&key regexp width height position noselect dedicated stick tail)
+    (destructuring-bind (&key regexp width height position noselect dedicated stick tail inside)
         (append (cdr pattern-and-keywords) default-config-keywords)
       (popwin:popup-buffer buffer
                            :width (or width popwin:popup-window-width)
@@ -930,7 +941,8 @@ specifies default values of the config."
                            :noselect (or (popwin:minibuffer-window-selected-p) noselect)
                            :dedicated dedicated
                            :stick stick
-                           :tail tail))))
+                           :tail tail
+                           :inside inside))))
 
 ;;;###autoload
 (defun popwin:display-buffer (buffer-or-name &optional not-this-window)
@@ -1086,7 +1098,7 @@ original window configuration."
     (define-key map "e"    'popwin:messages)
     (define-key map "\C-u" 'popwin:universal-display)
     (define-key map "1"    'popwin:one-window)
-    
+
     map)
   "Default keymap for popwin commands. Use like:
 \(global-set-key (kbd \"C-z\") popwin:keymap\)
